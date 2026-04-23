@@ -39,7 +39,7 @@ export interface Equipment extends Item {
   setName?: string;
 }
 
-export type EquipmentSlot = 'weapon' | 'head' | 'chest' | 'legs' | 'accessory1' | 'accessory2';
+export type EquipmentSlot = 'weapon' | 'head' | 'chest' | 'legs' | 'accessory1' | 'accessory2' | 'helmet';
 
 export interface Consumable extends Item {
   healAmount?: number;

@@ -1,10 +1,10 @@
 import { createActionGroup, props, emptyProps } from '@ngrx/store';
-import { Player, Attributes, Skill } from '../../models';
+import { Player, Attributes, Skill, PlayerClass } from '../../models';
 
 export const PlayerActions = createActionGroup({
   source: 'Player',
   events: {
-    'Create Player': props<{ name: string; attributes: Attributes }>(),
+    'Create Player': props<{ name: string; attributes: Attributes; playerClass: PlayerClass; avatar: string }>(),
     'Load Player': props<{ player: Player }>(),
     'Gain XP': props<{ amount: number }>(),
     'Level Up': emptyProps(),
@@ -18,12 +18,15 @@ export const PlayerActions = createActionGroup({
     'Reduce Corruption': props<{ amount: number }>(),
     'Equip Item': props<{ itemId: string }>(),
     'Unequip Item': props<{ slot: string }>(),
+    'Use Consumable': props<{ itemId: string }>(),
     'Add To Inventory': props<{ itemId: string }>(),
     'Remove From Inventory': props<{ itemId: string }>(),
     'Update Skill Efficiency': props<{ skillId: string; efficiency: number }>(),
     'Add Gold': props<{ amount: number }>(),
     'Spend Gold': props<{ amount: number }>(),
     'Add Loot': props<{ items: string[]; gold: number; xp: number }>(),
+    'Sell Item': props<{ itemId: string }>(),
+    'Distribute Attribute Point': props<{ attribute: keyof Attributes; amount: number }>(),
     'Prestige': emptyProps(),
     'Reset Player': emptyProps(),
   }

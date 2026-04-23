@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { CommonModule } from '@angular/common';
 import { Observable } from 'rxjs';
@@ -14,6 +14,8 @@ import {
   selectSkillPoints,
   selectIsPlayerDead,
   selectPlayerGold,
+  selectPlayerInventory,
+  selectEquippedItems,
   PlayerActions
 } from '../../store/player';
 import { 
@@ -39,19 +41,21 @@ import { Player, Enemy, Region, WorldEvent, Skill, Attributes, Item, ElementType
 import { BattleLog } from '../../store/battle';
 import { ShopItem } from '../../store/shop';
 import { AVAILABLE_SKILLS, SkillData, getSkillsByLevel } from '../../data/skills.data';
+import { ITEMS_DATA, getItemById, isConsumable, isEquipment, getItemSlot, getDropsByRarity, ItemData, Rarity } from '../../data/items.data';
 import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.component';
+import { ToastService } from '../../components/toast/toast.service';
 
 @Component({
   selector: 'app-game',
   standalone: true,
   imports: [CommonModule, AdsComponent, AdsBottomComponent],
   template: `
-    <div class="min-h-screen bg-gray-900 flex flex-col">
+    <div class="min-h-screen bg-dark-bg flex flex-col">
       <!-- Propaganda Topo -->
       <app-ads position="top"></app-ads>
       
       <!-- Header com stats -->
-      <header class="bg-gray-800 border-b border-gray-700 p-4">
+      <header class="bg-dark-card border-b border-dark-border p-4">
         <div class="max-w-7xl mx-auto">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -133,7 +137,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
       <!-- Main Content -->
       <main class="flex-1 flex">
         <!-- Sidebar - Regions -->
-        <aside class="w-64 bg-gray-800 border-r border-gray-700 p-4 hidden md:block">
+        <aside class="w-64 bg-dark-card border-r border-dark-border p-4 hidden md:block">
           <h2 class="text-gray-400 font-game text-xs mb-4">REGIÕES</h2>
           <div class="space-y-2">
             @for (region of regions$ | async; track region.id) {
@@ -233,7 +237,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
                 }
 
                 <!-- Battle Logs -->
-                <div class="bg-gray-900 p-3 rounded h-48 overflow-auto mb-4">
+                <div class="bg-dark-card p-3 rounded h-48 overflow-auto mb-4">
                   @for (log of battleLogs$ | async; track log.id) {
                     <p 
                       class="text-xs mb-1"
@@ -278,9 +282,56 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
                 <p class="text-gray-300 text-center text-sm mb-4">
                   Você derrotou o inimigo!
                 </p>
+                
+                <!-- Rewards -->
+                <div class="mb-4 p-3 bg-dark-card/50 rounded">
+                  <div class="flex justify-center gap-6 mb-3">
+                    <div class="text-center">
+                      <span class="text-yellow-400 text-2xl">🪙</span>
+                      <p class="text-yellow-400 text-sm">+{{ lootGold }}</p>
+                    </div>
+                    <div class="text-center">
+                      <span class="text-yellow-500 text-2xl">⭐</span>
+                      <p class="text-yellow-500 text-sm">+{{ lootXP }} XP</p>
+                    </div>
+                  </div>
+                  
+                  @if (lootDrops.length > 0) {
+                    <div class="grid grid-cols-1 gap-2">
+                      @for (drop of lootDrops; track drop.item.id) {
+                        <div 
+                          class="p-3 rounded border"
+                          [class.border-yellow-600]="drop.rarity === 'legendary'"
+                          [class.border-purple-600]="drop.rarity === 'epic'"
+                          [class.border-blue-600]="drop.rarity === 'rare'"
+                          [class.border-green-600]="drop.rarity === 'uncommon'"
+                          [class.border-gray-600]="drop.rarity === 'common'"
+                        >
+                          <div class="flex items-center gap-2">
+                            <span class="text-2xl">{{ drop.item.icon }}</span>
+                            <div>
+                              <p class="text-white text-sm font-bold">{{ drop.item.name }}</p>
+                              <p 
+                                class="text-xs"
+                                [class.text-yellow-400]="drop.rarity === 'legendary'"
+                                [class.text-purple-400]="drop.rarity === 'epic'"
+                                [class.text-blue-400]="drop.rarity === 'rare'"
+                                [class.text-green-400]="drop.rarity === 'uncommon'"
+                                [class.text-gray-400]="drop.rarity === 'common'"
+                              >
+                                {{ drop.rarity | titlecase }}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+                
                 <div class="flex justify-center gap-4">
-                  <button (click)="endBattle()" class="btn-game bg-green-600 hover:bg-green-700">
-                    CONTINUAR
+                  <button (click)="collectLoot()" class="btn-game bg-green-600 hover:bg-green-700">
+                    COLETAR
                   </button>
                 </div>
               </div>
@@ -300,7 +351,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
                 
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                   @for (item of shopItems$ | async; track item.id) {
-                    <div class="bg-gray-900 p-3 rounded border"
+                    <div class="bg-dark-card p-3 rounded border"
                          [class.border-yellow-600]="item.rarity === 'legendary'"
                          [class.border-purple-600]="item.rarity === 'epic'"
                          [class.border-blue-600]="item.rarity === 'rare'"
@@ -345,7 +396,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
                 
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                   @for (skill of getAvailableSkills(); track skill.id) {
-                    <div class="bg-gray-900 p-3 rounded border"
+                    <div class="bg-dark-card p-3 rounded border"
                          [class.border-purple-600]="skill.levelRequired > 7"
                          [class.border-blue-600]="skill.levelRequired > 3 && skill.levelRequired <= 7"
                          [class.border-green-600]="skill.levelRequired <= 3">
@@ -377,7 +428,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
               <div class="card-game mb-4 border-yellow-500">
                 <h2 class="text-yellow-400 font-game text-sm mb-3">⚡ EVENTOS DO MUNDO</h2>
                 @for (event of events; track event.id) {
-                  <div class="bg-gray-900 p-2 rounded mb-2">
+                  <div class="bg-dark-card p-2 rounded mb-2">
                     <p class="text-white text-xs">{{ event.description }}</p>
                   </div>
                 }
@@ -411,7 +462,7 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
                   <p class="text-gray-500 text-xs">Compre itens</p>
                 </button>
 
-                <button class="card-game p-6 hover:border-blue-500 transition-colors cursor-pointer">
+                <button (click)="openInventory()" class="card-game p-6 hover:border-blue-500 transition-colors cursor-pointer">
                   <div class="text-4xl mb-3">🎒</div>
                   <h3 class="text-white font-game text-sm mb-2">INVENTÁRIO</h3>
                   <p class="text-gray-500 text-xs">Gerencie itens</p>
@@ -452,6 +503,186 @@ import { AdsComponent, AdsBottomComponent } from '../../components/ads/ads.compo
               </div>
             </div>
           }
+
+          <!-- Inventory Modal -->
+          @if (isInventoryOpen) {
+            <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+              <div class="card-game max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                  <h2 class="text-xl font-game text-blue-400">🎒 INVENTÁRIO</h2>
+                  <button (click)="closeInventory()" class="btn-game bg-red-600">✕</button>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="flex gap-2 mb-4">
+                  <button 
+                    (click)="selectedTab = 'inventory'"
+                    class="btn-game"
+                    [class.bg-primary]="selectedTab === 'inventory'"
+                    [class.bg-dark-border]="selectedTab !== 'inventory'"
+                  >
+                    🎒 INVENTÁRIO
+                  </button>
+                  <button 
+                    (click)="selectedTab = 'equipment'"
+                    class="btn-game"
+                    [class.bg-primary]="selectedTab === 'equipment'"
+                    [class.bg-dark-border]="selectedTab !== 'equipment'"
+                  >
+                    ⚔️ EQUIPADOS
+                  </button>
+                  <button 
+                    (click)="selectedTab = 'consumables'"
+                    class="btn-game"
+                    [class.bg-red-600]="selectedTab === 'consumables'"
+                    [class.bg-dark-border]="selectedTab !== 'consumables'"
+                  >
+                    🧪 CONSUMÍVEIS
+                  </button>
+                  <button 
+                    (click)="selectedTab = 'trophies'"
+                    class="btn-game"
+                    [class.bg-purple-600]="selectedTab === 'trophies'"
+                    [class.bg-dark-border]="selectedTab !== 'trophies'"
+                  >
+                    🏆 TROFÉUS
+                  </button>
+                </div>
+                
+                <!-- Inventory Tab -->
+                @if (selectedTab === 'inventory') {
+                  <div class="flex-1 overflow-auto">
+                    @if ((inventory$ | async)!.length > 0) {
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        @for (itemId of (inventory$ | async)!; track itemId) {
+                          @if (getItemData(itemId); as item) {
+                            <div class="bg-dark-card p-3 rounded border"
+                                 [class.border-yellow-600]="item.rarity === 'legendary'"
+                                 [class.border-purple-600]="item.rarity === 'epic'"
+                                 [class.border-blue-600]="item.rarity === 'rare'"
+                                 [class.border-green-600]="item.rarity === 'uncommon'"
+                                 [class.border-gray-600]="item.rarity === 'common'">
+                              <div class="flex items-center gap-2 mb-2">
+                                <span class="text-2xl">{{ item.icon || '📦' }}</span>
+                                <div>
+                                  <p class="text-white text-xs">{{ item.name }}</p>
+                                  <p class="text-gray-500 text-xs">{{ item.type }} - Nv.{{ item.levelRequired }}</p>
+                                  <p class="text-yellow-500 text-xs">🪙 {{ getSellValue(item) }}</p>
+                                </div>
+                              </div>
+                              <div class="flex gap-1 mt-2">
+                                @if (checkIsEquipment(itemId)) {
+                                  <button 
+                                    (click)="equipItem(itemId)"
+                                    class="btn-game flex-1 text-xs bg-green-600 hover:bg-green-700"
+                                  >
+                                    EQUIPAR
+                                  </button>
+                                }
+                                <button 
+                                  (click)="sellItem(itemId)"
+                                  class="btn-game flex-1 text-xs bg-yellow-600 hover:bg-yellow-700"
+                                >
+                                  VENDER
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <p class="text-gray-500 text-center py-8">Inventário vazio</p>
+                    }
+                  </div>
+                }
+                
+                <!-- Equipment Tab -->
+                @if (selectedTab === 'equipment') {
+                  <div class="flex-1 overflow-auto">
+                    @if ((equippedItems$ | async)!.length > 0) {
+                      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        @for (itemId of (equippedItems$ | async)!; track itemId) {
+                          @if (getItemData(itemId); as item) {
+                            <div class="bg-dark-card p-3 rounded border"
+                                 [class.border-yellow-600]="item.rarity === 'legendary'"
+                                 [class.border-purple-600]="item.rarity === 'epic'"
+                                 [class.border-blue-600]="item.rarity === 'rare'"
+                                 [class.border-green-600]="item.rarity === 'uncommon'"
+                                 [class.border-gray-600]="item.rarity === 'common'">
+                              <div class="flex items-center gap-2 mb-2">
+                                <span class="text-2xl">{{ item.icon || '📦' }}</span>
+                                <div>
+                                  <p class="text-white text-xs">{{ item.name }}</p>
+                                  <p class="text-gray-500 text-xs">{{ item.slot || item.type }}</p>
+                                </div>
+                              </div>
+                              @if (item.stats) {
+                                <div class="text-xs text-gray-400 mb-2">
+                                  @if (item.stats.attack) { <span class="text-red-400">ATK +{{ item.stats.attack }}</span> }
+                                  @if (item.stats.defense) { <span class="text-blue-400">DEF +{{ item.stats.defense }}</span> }
+                                  @if (item.stats.str) { <span class="text-red-400">FOR +{{ item.stats.str }}</span> }
+                                  @if (item.stats.dex) { <span class="text-green-400">DES +{{ item.stats.dex }}</span> }
+                                  @if (item.stats.int) { <span class="text-blue-400">INT +{{ item.stats.int }}</span> }
+                                  @if (item.stats.vit) { <span class="text-yellow-400">VIT +{{ item.stats.vit }}</span> }
+                                  @if (item.stats.lck) { <span class="text-purple-400">SOR +{{ item.stats.lck }}</span> }
+                                </div>
+                              }
+                              <button 
+                                (click)="unequipItem(item.slot || item.type)"
+                                class="btn-game w-full mt-2 text-xs bg-red-600 hover:bg-red-700"
+                              >
+                                DESSUIPAR
+                              </button>
+                            </div>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <p class="text-gray-500 text-center py-8">Nenhum item equipado</p>
+                    }
+                  </div>
+                }
+                
+                <!-- Consumables Tab -->
+                @if (selectedTab === 'consumables') {
+                  <div class="flex-1 overflow-auto">
+                    @if ((inventory$ | async)!.length > 0) {
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        @for (itemId of (inventory$ | async)!; track itemId) {
+                          @if (checkIsConsumable(itemId); as item) {
+                            <div class="bg-dark-card p-3 rounded border border-red-600">
+                              <div class="flex items-center gap-2 mb-2">
+                                <span class="text-2xl">{{ item.icon || '📦' }}</span>
+                                <div>
+                                  <p class="text-white text-xs">{{ item.name }}</p>
+                                  <p class="text-gray-500 text-xs">{{ item.description }}</p>
+                                </div>
+                              </div>
+                              <button 
+                                (click)="usePotion(itemId)"
+                                class="btn-game w-full mt-2 text-xs bg-red-600 hover:bg-red-700"
+                              >
+                                USAR
+                              </button>
+                            </div>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <p class="text-gray-500 text-center py-8">Nenhuma poção no inventário</p>
+                    }
+                  </div>
+                }
+
+                <!-- Trophies Tab -->
+                @if (selectedTab === 'trophies') {
+                  <div class="flex-1 overflow-auto">
+                    <p class="text-gray-500 text-center py-8">🏆 Troféus collected will appear here</p>
+                  </div>
+                }
+              </div>
+            </div>
+          }
         </div>
       
       <!-- Propaganda Rodapé -->
@@ -471,6 +702,8 @@ export class GameComponent implements OnInit {
   skills$: Observable<Skill[]>;
   skillPoints$: Observable<number>;
   gold$: Observable<number>;
+  inventory$: Observable<string[]>;
+  equippedItems$: Observable<string[]>;
   worldLevel$: Observable<number>;
   regions$: Observable<Region[]>;
   activeEvents$: Observable<WorldEvent[]>;
@@ -483,6 +716,11 @@ export class GameComponent implements OnInit {
   shopItems$: Observable<ShopItem[]>;
   isShopOpen$: Observable<boolean>;
   isSkillsOpen = false;
+  isInventoryOpen = false;
+  selectedTab: 'inventory' | 'equipment' | 'consumables' | 'trophies' = 'inventory';
+  lootDrops: { item: ItemData; rarity: Rarity }[] = [];
+  lootGold = 0;
+  lootXP = 0;
   private playerLevelValue = 1;
 
   private healthData: { current: number; max: number } = { current: 0, max: 0 };
@@ -492,7 +730,7 @@ export class GameComponent implements OnInit {
   private enemyValue: Enemy | null = null;
   private isPlayerTurnValue = true;
 
-  constructor(private store: Store) {
+  constructor(private store: Store, private cdr: ChangeDetectorRef, private toast: ToastService) {
     this.player$ = this.store.select(selectPlayer);
     this.level$ = this.store.select(selectPlayerLevel);
     this.health$ = this.store.select(selectPlayerHealth);
@@ -503,6 +741,8 @@ export class GameComponent implements OnInit {
     this.skills$ = this.store.select(selectPlayerSkills);
     this.skillPoints$ = this.store.select(selectSkillPoints);
     this.gold$ = this.store.select(selectPlayerGold);
+    this.inventory$ = this.store.select(selectPlayerInventory);
+    this.equippedItems$ = this.store.select(selectEquippedItems);
     this.worldLevel$ = this.store.select(selectWorldLevel);
     this.regions$ = this.store.select(selectRegions);
     this.activeEvents$ = this.store.select(selectActiveEvents);
@@ -544,21 +784,44 @@ export class GameComponent implements OnInit {
   handleVictory() {
     setTimeout(() => {
       if (this.enemyValue && this.battleStatusValue === 'victory') {
-        const goldReward = Math.floor(this.enemyValue.xpReward * 0.3);
-        const xpReward = Math.floor(this.enemyValue.xpReward * 0.5);
+        this.lootGold = Math.floor(this.enemyValue.xpReward * 0.3);
+        this.lootXP = Math.floor(this.enemyValue.xpReward * 0.5);
         
-        this.store.dispatch(PlayerActions.addGold({ amount: goldReward }));
-        this.store.dispatch(PlayerActions.gainXP({ amount: xpReward }));
-        
-        const droppedItems = this.calculateDrops();
-        if (droppedItems.length > 0) {
-          this.store.dispatch(PlayerActions.addToInventory({ itemId: droppedItems[0] }));
+        this.lootDrops = [];
+        const dropResult = getDropsByRarity();
+        if (dropResult) {
+          this.lootDrops.push(dropResult);
         }
-        
-        this.store.dispatch(PlayerActions.heal({ amount: Math.floor(this.healthData.max * 0.3) }));
-        this.store.dispatch(BattleActions.endBattle());
       }
     }, 1000);
+  }
+
+  collectLoot() {
+    this.store.dispatch(PlayerActions.addGold({ amount: this.lootGold }));
+    this.store.dispatch(PlayerActions.gainXP({ amount: this.lootXP }));
+    
+    if (this.lootDrops.length > 0) {
+      this.lootDrops.forEach(drop => {
+        this.store.dispatch(PlayerActions.addToInventory({ itemId: drop.item.id }));
+      });
+    }
+    
+    this.store.dispatch(PlayerActions.heal({ amount: Math.floor(this.healthData.max * 0.3) }));
+    this.store.dispatch(BattleActions.endBattle());
+    
+    if (this.lootGold > 0) this.toast.success(`+${this.lootGold} ouro`);
+    if (this.lootXP > 0) this.toast.success(`+${this.lootXP} XP`);
+    if (this.lootDrops.length > 0) {
+      this.lootDrops.forEach(drop => {
+        this.toast.loot(`${drop.item.icon} ${drop.item.name}`);
+      });
+    }
+    
+    this.cdr.markForCheck();
+    
+    this.lootDrops = [];
+    this.lootGold = 0;
+    this.lootXP = 0;
   }
 
   getAvailableSkills(): SkillData[] {
@@ -737,5 +1000,56 @@ export class GameComponent implements OnInit {
     this.store.dispatch(PlayerActions.spendGold({ amount: item.value }));
     this.store.dispatch(PlayerActions.addToInventory({ itemId: item.id }));
     this.store.dispatch(ShopActions.buyItem({ item }));
+  }
+
+  openInventory() {
+    this.isInventoryOpen = true;
+    this.selectedTab = 'inventory';
+  }
+
+  closeInventory() {
+    this.isInventoryOpen = false;
+  }
+
+  equipItem(itemId: string) {
+    const item = getItemById(itemId);
+    this.store.dispatch(PlayerActions.equipItem({ itemId }));
+    if (item) this.toast.success(`${item.icon} Equipado!`);
+    this.cdr.markForCheck();
+  }
+
+  unequipItem(slot: string) {
+    this.store.dispatch(PlayerActions.unequipItem({ slot }));
+    this.toast.warning(`Slot ${slot} desequipado`);
+    this.cdr.markForCheck();
+  }
+
+  usePotion(itemId: string) {
+    this.store.dispatch(PlayerActions.useConsumable({ itemId }));
+    this.cdr.markForCheck();
+  }
+
+  sellItem(itemId: string) {
+    const item = getItemById(itemId);
+    const sellValue = item ? Math.floor(item.levelRequired * 10 * 0.5) : 0;
+    this.store.dispatch(PlayerActions.sellItem({ itemId }));
+    if (item) this.toast.success(`+${sellValue} ouro`);
+    this.cdr.markForCheck();
+  }
+
+  getItemData(itemId: string) {
+    return getItemById(itemId);
+  }
+
+  checkIsEquipment(itemId: string): boolean {
+    return isEquipment(itemId);
+  }
+
+  checkIsConsumable(itemId: string) {
+    return isConsumable(itemId) ? getItemById(itemId) : null;
+  }
+
+  getSellValue(item: any): number {
+    return item ? Math.floor(item.value / 2) : 0;
   }
 }

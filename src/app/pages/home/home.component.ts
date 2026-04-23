@@ -1,6 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Store } from '@ngrx/store';
+import { StorageService } from '../../services/storage.service';
+import { PlayerActions } from '../../store/player';
 
 @Component({
   selector: 'app-home',
@@ -58,7 +61,9 @@ import { CommonModule } from '@angular/common';
         </button>
         
         <button 
-          class="btn-game text-lg px-8 py-4 bg-gray-700 hover:bg-gray-600"
+          (click)="continueGame()"
+          [disabled]="!storage.hasPlayer()"
+          class="btn-game text-lg px-8 py-4 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           CONTINUAR
         </button>
@@ -71,9 +76,19 @@ import { CommonModule } from '@angular/common';
   `
 })
 export class HomeComponent {
-  constructor(private router: Router) {}
+  private router = inject(Router);
+  private store = inject(Store);
+  storage = inject(StorageService);
 
   startGame() {
     this.router.navigate(['/character-create']);
+  }
+
+  continueGame() {
+    const player = this.storage.loadPlayer();
+    if (player) {
+      this.store.dispatch(PlayerActions.loadPlayer({ player }));
+      this.router.navigate(['/game']);
+    }
   }
 }

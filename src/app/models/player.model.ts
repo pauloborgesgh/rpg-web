@@ -7,6 +7,21 @@ export interface Attributes {
 }
 
 export type ElementType = 'fogo' | 'gelo' | 'luz' | 'sombra' | 'raio' | 'vento';
+export type PlayerClass = 'warrior' | 'mage' | 'rogue' | 'ranger';
+
+export const CLASS_INFO: Record<PlayerClass, { name: string; icon: string; description: string; bonus: Partial<Attributes> }> = {
+  warrior: { name: 'Guerreiro', icon: '⚔️', description: 'lutador corpo a corpo com alta defesa', bonus: { str: 2 } },
+  mage: { name: 'Mago', icon: '🔮', description: 'mestre das artes arcanas', bonus: { int: 2 } },
+  rogue: { name: 'Ladrão', icon: '🗡️', description: 'veloz e furtivo', bonus: { dex: 2 } },
+  ranger: { name: 'Caçador', icon: '🏹', description: 'expert em combate à distância', bonus: { dex: 1, lck: 1 } }
+};
+
+export const CLASS_AVATARS: Record<PlayerClass, string[]> = {
+  warrior: ['🛡️', '🪖', '⚔️', '👹', '🧙‍♂️', '🦾'],
+  mage: ['🔮', '🧙', '🧙‍♀️', '🌙', '⭐', '🌟'],
+  rogue: ['🗡️', '🥷', '🌑', '💨', '⚔️', '🌚'],
+  ranger: ['🏹', '🧝', '🧝‍♂️', '🌲', '🐺', '🎯']
+};
 
 export interface Skill {
   id: string;
@@ -35,6 +50,7 @@ export interface Player {
   mana: number;
   maxMana: number;
   skillPoints: number;
+  attributePoints: number;
   skills: Skill[];
   unlockedSkills: string[];
   corruption: number;
@@ -42,6 +58,8 @@ export interface Player {
   inventory: string[];
   prestigeLevel: number;
   gold: number;
+  class: PlayerClass;
+  avatar: string;
 }
 
 export const INITIAL_ATTRIBUTES: Attributes = {

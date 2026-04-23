@@ -1,5 +1,6 @@
 import { createFeatureSelector, createSelector } from '@ngrx/store';
 import { PlayerState } from './player.reducer';
+import { ITEMS_DATA } from '../../data/items.data';
 
 export const selectPlayerState = createFeatureSelector<PlayerState>('player');
 
@@ -38,6 +39,11 @@ export const selectPlayerInventory = createSelector(
   (player) => player?.inventory ?? []
 );
 
+export const selectEquippedItems = createSelector(
+  selectPlayer,
+  (player) => player?.equippedItems ?? []
+);
+
 export const selectPlayerAttributes = createSelector(
   selectPlayer,
   (player) => player?.attributes ?? { str: 5, dex: 5, int: 5, vit: 5, lck: 5 }
@@ -53,6 +59,21 @@ export const selectSkillPoints = createSelector(
   (player) => player?.skillPoints ?? 0
 );
 
+export const selectAttributePoints = createSelector(
+  selectPlayer,
+  (player) => player?.attributePoints ?? 0
+);
+
+export const selectPlayerClass = createSelector(
+  selectPlayer,
+  (player) => player?.class ?? 'warrior'
+);
+
+export const selectPlayerAvatar = createSelector(
+  selectPlayer,
+  (player) => player?.avatar ?? '⚔️'
+);
+
 export const selectIsPlayerDead = createSelector(
   selectPlayer,
   (player) => (player?.health ?? 100) <= 0
@@ -61,4 +82,30 @@ export const selectIsPlayerDead = createSelector(
 export const selectPlayerGold = createSelector(
   selectPlayer,
   (player) => player?.gold ?? 100
+);
+
+export const selectInventoryCount = createSelector(
+  selectPlayerInventory,
+  (inventory) => inventory.length
+);
+
+export const selectConsumablesInInventory = createSelector(
+  selectPlayer,
+  (player) => {
+    if (!player) return [];
+    return player.inventory.filter(id => {
+      const item = ITEMS_DATA[id];
+      return item?.type === 'consumable';
+    });
+  }
+);
+
+export const selectPotionsCount = createSelector(
+  selectPlayer,
+  (player) => {
+    if (!player) return { healthPotions: 0, manaPotions: 0 };
+    const healthPotions = player.inventory.filter(id => id === 'potion_hp').length;
+    const manaPotions = player.inventory.filter(id => id === 'potion_mp').length;
+    return { healthPotions, manaPotions };
+  }
 );
