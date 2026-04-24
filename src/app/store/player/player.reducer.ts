@@ -223,12 +223,15 @@ export const playerReducer = createReducer(
     };
   }),
   on(PlayerActions.addToInventory, (state, { itemId }) => {
+    console.log('[REDUCER] addToInventory received:', itemId, { currentInventory: state.player?.inventory });
     if (!state.player) return state;
+    const newInventory = [...state.player.inventory, itemId];
+    console.log('[REDUCER] New inventory:', newInventory);
     return {
       ...state,
       player: {
         ...state.player,
-        inventory: [...state.player.inventory, itemId]
+        inventory: newInventory
       }
     };
   }),

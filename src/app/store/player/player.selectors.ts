@@ -36,7 +36,11 @@ export const selectPlayerSkills = createSelector(
 
 export const selectPlayerInventory = createSelector(
   selectPlayer,
-  (player) => player?.inventory ?? []
+  (player) => {
+    const inventory = player?.inventory ?? [];
+    console.log('[SELECTOR] selectPlayerInventory:', inventory);
+    return inventory;
+  }
 );
 
 export const selectEquippedItems = createSelector(

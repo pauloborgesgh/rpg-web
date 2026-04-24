@@ -32,24 +32,14 @@ export class StorageEffects {
       ),
       withLatestFrom(this.store.select(selectPlayer)),
       tap(([action, player]) => {
+        console.log('[StorageEffects] Saving player:', player?.name);
         if (player) {
           this.storage.savePlayer(player);
+        } else {
+          console.warn('[StorageEffects] Player is null, cannot save!');
         }
       })
     ),
     { dispatch: false }
-  );
-
-  loadPlayerOnInit$ = createEffect(() =>
-    this.actions$.pipe(
-      ofType(PlayerActions.loadPlayer),
-      map(() => {
-        const player = this.storage.loadPlayer();
-        if (player) {
-          return PlayerActions.loadPlayer({ player });
-        }
-        return { type: '[Storage] No Save Found' };
-      })
-    )
   );
 }

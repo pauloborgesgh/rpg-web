@@ -267,10 +267,45 @@ import { ToastService } from '../../components/toast/toast.service';
                   </div>
                 } @else {
                   <p class="text-yellow-400 text-center text-sm animate-pulse">
-                    Turno do inimigo...
+Turno do inimigo...
                   </p>
                 }
               </div>
+
+              <!-- Skill Selection Modal -->
+              @if (isSkillSelectOpen) {
+                <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                  <div class="card-game max-w-md w-full p-4">
+                    <div class="flex justify-between items-center mb-4">
+                      <h2 class="text-xl font-game text-blue-400">✨ ESCOLHA HABILIDADE</h2>
+                      <button (click)="closeSkillSelect()" class="btn-game bg-red-600">✕</button>
+                    </div>
+                    
+                    @if (skills$ | async; as skills) {
+                      @if (skills.length > 0) {
+                        <div class="grid grid-cols-2 gap-2 max-h-60 overflow-auto">
+                          @for (skill of skills; track skill.id) {
+                            <button 
+                              (click)="selectSkillAndUse(skill.id, skill.manaCost)"
+                              class="bg-dark-card p-3 rounded border border-blue-600 hover:bg-dark-hover"
+                            >
+                              <div class="flex items-center gap-2">
+                                <span class="text-2xl">{{ skill.icon || '✨' }}</span>
+                                <div class="text-left">
+                                  <p class="text-white text-sm">{{ skill.name }}</p>
+                                  <p class="text-blue-400 text-xs">MP: {{ skill.manaCost }}</p>
+                                </div>
+                              </div>
+                            </button>
+                          }
+                        </div>
+                      } @else {
+                        <p class="text-gray-500 text-center">Nenhuma habilidade disponível!</p>
+                      }
+                    }
+                  </div>
+                </div>
+              }
             }
 
             <!-- Victory -->
@@ -716,6 +751,7 @@ export class GameComponent implements OnInit {
   shopItems$: Observable<ShopItem[]>;
   isShopOpen$: Observable<boolean>;
   isSkillsOpen = false;
+  isSkillSelectOpen = false;
   isInventoryOpen = false;
   selectedTab: 'inventory' | 'equipment' | 'consumables' | 'trophies' = 'inventory';
   lootDrops: { item: ItemData; rarity: Rarity }[] = [];
@@ -797,11 +833,28 @@ export class GameComponent implements OnInit {
   }
 
   collectLoot() {
+    console.log('[DEBUG] collectLoot called', { lootDrops: this.lootDrops, lootGold: this.lootGold, lootXP: this.lootXP });
+    
+    // Verificar se o player existe primeiro -.subscribe para obter valor imediato
+    let playerValid = false;
+    this.store.select(selectPlayer).subscribe(player => {
+      console.log('[DEBUG] Current player in store:', player?.name, player?.inventory?.length);
+      playerValid = !!player;
+    });
+    
+    if (!playerValid) {
+      this.toast.error('Erro: Personagem não encontrado! Recarregue a página.');
+      console.error('[DEBUG] Player is null! Cannot collect loot.');
+      return;
+    }
+    
     this.store.dispatch(PlayerActions.addGold({ amount: this.lootGold }));
     this.store.dispatch(PlayerActions.gainXP({ amount: this.lootXP }));
     
     if (this.lootDrops.length > 0) {
+      console.log('[DEBUG] Adding items to inventory:', this.lootDrops.map(d => d.item.id));
       this.lootDrops.forEach(drop => {
+        console.log('[DEBUG] Dispatching addToInventory:', drop.item.id);
         this.store.dispatch(PlayerActions.addToInventory({ itemId: drop.item.id }));
       });
     }
@@ -915,8 +968,17 @@ export class GameComponent implements OnInit {
   }
 
   useSkill() {
-    this.store.dispatch(PlayerActions.useMana({ amount: 15 }));
-    this.store.dispatch(BattleActions.useSkill({ skillId: 'fireball' }));
+    this.isSkillSelectOpen = true;
+  }
+
+  selectSkillAndUse(skillId: string, manaCost: number) {
+    this.store.dispatch(PlayerActions.useMana({ amount: manaCost }));
+    this.store.dispatch(BattleActions.useSkill({ skillId: skillId }));
+    this.isSkillSelectOpen = false;
+  }
+
+  closeSkillSelect() {
+    this.isSkillSelectOpen = false;
   }
 
   flee() {
